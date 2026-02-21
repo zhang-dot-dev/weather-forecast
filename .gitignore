@@ -14,9 +14,10 @@ build/
 *.swp
 .cursor/
 
-# Data (too large for git)
+# Data (too large for git; 目录结构用 .gitkeep 保留)
 data/raw/*.csv
-data/processed/
+data/processed/*
+!data/processed/.gitkeep
 
 # Outputs (reproducible)
 outputs/models/
