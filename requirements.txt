@@ -6,3 +6,7 @@ scipy
 scikit-learn
 joblib
 pyarrow
+statsmodels
+xgboost
+lightgbm
+catboost

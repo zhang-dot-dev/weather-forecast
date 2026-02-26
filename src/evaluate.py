@@ -39,16 +39,27 @@ def results_to_dataframe(results):
     return pd.DataFrame(rows).set_index('Model')
 
 
-def feature_count_curve(X, y, ensemble_scores, counts=None):
+def feature_count_curve(X, y, ensemble_scores, counts=None, cache_path=None):
     """不同特征数量下的 CV RMSE，用于确定最优特征数。
+
+    使用 Ridge 回归（快速）来展示趋势。支持缓存。
 
     Returns:
         feature_counts: list[int]
         cv_rmses: list[float]
     """
+    from pathlib import Path
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
-    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.linear_model import Ridge
+
+    if cache_path is not None:
+        cache_path = Path(cache_path)
+        if cache_path.exists():
+            import pandas as _pd
+            cached = _pd.read_csv(cache_path)
+            print(f"    Loaded cached learning curve ({len(cached)} points)")
+            return cached['n'].tolist(), cached['rmse'].tolist()
 
     sorted_features = ensemble_scores.sort_values(ascending=False).index.tolist()
     if counts is None:
@@ -60,9 +71,7 @@ def feature_count_curve(X, y, ensemble_scores, counts=None):
         top_n = sorted_features[:n]
         pipe = Pipeline([
             ('scaler', StandardScaler()),
-            ('rf', RandomForestRegressor(
-                n_estimators=50, max_depth=6,
-                n_jobs=-1, random_state=RANDOM_STATE)),
+            ('ridge', Ridge(alpha=1.0)),
         ])
         cv = cross_val_score(
             pipe, X[top_n], y, cv=3,
@@ -71,5 +80,11 @@ def feature_count_curve(X, y, ensemble_scores, counts=None):
         rmse = np.sqrt(-cv.mean())
         cv_rmses.append(rmse)
         print(f"    n_features={n:3d}  RMSE={rmse:.3f}")
+
+    if cache_path is not None:
+        import pandas as _pd
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        _pd.DataFrame({'n': counts, 'rmse': cv_rmses}).to_csv(cache_path, index=False)
+        print(f"    Cached to {cache_path}")
 
     return counts, cv_rmses

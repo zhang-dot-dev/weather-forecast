@@ -22,7 +22,6 @@ data/processed/*
 # Outputs (reproducible)
 outputs/models/
 outputs/predictions/
-outputs/figures/
 
 # Jupyter
 .ipynb_checkpoints/

@@ -4,7 +4,7 @@ from pathlib import Path
 BASE_DIR   = Path(__file__).parent
 DATA_RAW   = BASE_DIR / "data/raw/train_data.csv"
 DATA_TEST  = BASE_DIR / "data/raw/test_data.csv"
-DATA_PROC  = BASE_DIR / "data/processed/train_processed.parquet"
+DATA_PROC  = BASE_DIR / "data/processed/train_processed.csv"
 MODEL_DIR  = BASE_DIR / "outputs/models"
 FIG_DIR    = BASE_DIR / "outputs/figures"
 PRED_DIR   = BASE_DIR / "outputs/predictions"
