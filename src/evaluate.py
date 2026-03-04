@@ -8,6 +8,8 @@ from config import CV_FOLDS, RANDOM_STATE
 def cross_validate_all(models, X, y, cv=None):
     """对多个模型执行交叉验证，返回 {name: {rmse, r2}} 字典。"""
     cv = cv or CV_FOLDS
+    if not isinstance(X, pd.DataFrame):
+        X = pd.DataFrame(X)
     results = {}
     for name, model in models.items():
         mse_scores = cross_val_score(
