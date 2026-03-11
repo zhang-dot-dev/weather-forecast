@@ -37,10 +37,19 @@ def build_models() -> dict:
     return {name: m.build_pipeline() for name, m in discover_models().items()}
 
 
-def save_model(model, name):
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(model, MODEL_DIR / f"{name}.pkl")
+def save_model(model, name, run_id=None):
+    """保存模型。指定 run_id 时存到 MODEL_DIR/<run_id>/ 子目录。"""
+    target = MODEL_DIR / run_id if run_id else MODEL_DIR
+    target.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, target / f"{name}.pkl")
 
 
-def load_model(name):
-    return joblib.load(MODEL_DIR / f"{name}.pkl")
+def load_model(name, run_id=None):
+    """加载模型。指定 run_id 可恢复某次历史运行的模型。"""
+    target = MODEL_DIR / run_id if run_id else MODEL_DIR
+    return joblib.load(target / f"{name}.pkl")
+
+
+def list_runs():
+    """列出所有保存过模型的 run_id。"""
+    return sorted([d.name for d in MODEL_DIR.iterdir() if d.is_dir()])

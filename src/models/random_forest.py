@@ -18,7 +18,7 @@ class RandomForestModel(BaseModel):
 
     def param_grid(self):
         return {
-            'model__n_estimators': [100, 200, 300],
-            'model__max_depth': [6, 10, 15],
-            'model__min_samples_leaf': [1, 5, 10],
+            'model__n_estimators': [100, 200, 300, 400, 500],
+            'model__max_depth': [6, 8, 10, 12, 15, 20],
+            'model__min_samples_leaf': [5, 10],
         }

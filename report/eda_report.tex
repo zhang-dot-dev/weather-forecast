@@ -1,69 +1,19 @@
-\documentclass[11pt,a4paper]{article}
-
-% ──────────────────────────────────────────────────────────────
-% Packages
-% ──────────────────────────────────────────────────────────────
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{geometry}
-\geometry{margin=2.5cm}
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{hyperref}
-\usepackage{amsmath,amssymb}
-\usepackage{xcolor}
-\usepackage{caption}
-\usepackage{subcaption}
-\usepackage{enumitem}
-\usepackage{float}
-\usepackage{titlesec}
-\usepackage{fancyhdr}
-
-% ──────────────────────────────────────────────────────────────
-% Page Style
-% ──────────────────────────────────────────────────────────────
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{\small EDA Report — Sub-Seasonal Temperature Prediction}
-\fancyhead[R]{\small WiDS Datathon 2023}
-\fancyfoot[C]{\thepage}
-
-\hypersetup{
-    colorlinks=true,
-    linkcolor=blue!60!black,
-    citecolor=green!50!black,
-    urlcolor=blue!70!black,
-}
-
-% ──────────────────────────────────────────────────────────────
-\title{\textbf{Exploratory Data Analysis Report} \\[0.3em]
-       \large Sub-Seasonal Temperature Prediction \\
-       WiDS Datathon 2023}
-\author{Team Name}
-\date{\today}
-
-\begin{document}
-\maketitle
-\tableofcontents
+% EDA %
 \newpage
+\section{Exploratory Data Analysis}
+\thispagestyle{plain}
+\vspace{0.5em}
 
 % ══════════════════════════════════════════════════════════════
 % Section 1: Introduction & Dataset Overview
 % ══════════════════════════════════════════════════════════════
-\section{Introduction \& Dataset Overview}
+\subsection{Dataset Overview}
 
-\subsection{Task Definition}
-% Predict the 2-meter temperature over the next 14 days (sub-seasonal timescale)
-% Target variable: contest-tmp2m-14d__tmp2m = (tmax + tmin) / 2
-
-The core task is to predict the 2-meter temperature over the next 14 days (sub-seasonal timescale) at various locations across the United States. The target variable, \texttt{contest-tmp2m-14d\_\_tmp2m}, is defined as the arithmetic mean of the observed daily maximum and minimum temperatures during the 14-day period following each start date, i.e., $T_{\text{target}} = (T_{\max} + T_{\min}) / 2$.
-
-\subsection{Dataset Description}
+\subsubsection{Dataset Description}
 
 The training dataset (\texttt{train\_data.csv}) contains \textbf{375,734 rows} and \textbf{246 columns} (including the target variable), covering the period from September 2014 to August 2016. Each row represents one location (with anonymized latitude and longitude) and one start date of a 14-day forecast window.
 
-\subsection{Task Definition}
+\subsubsection{Task Definition}
 
 The prediction task is a supervised regression problem: given a set of meteorological, climatic, and geographic features observed at or before the start date, predict the 14-day mean 2-meter temperature at each location. The target variable, \texttt{contest-tmp2m-14d\_\_tmp2m}, is defined as $T_{\text{target}} = (T_{\max} + T_{\min}) / 2$ over the 14-day forecast window. The test set follows the same structure as the training set, but the true target values are withheld for evaluation. Model performance is assessed using root mean squared error (RMSE) between the predicted and observed temperatures.
 
@@ -89,15 +39,6 @@ Others                         & 1   & Start date (for deriving seasonal and tem
 \end{tabular}
 \end{table}
 
-\subsection{EDA Objectives}
-
-The main objectives of this EDA are to:
-\begin{enumerate}[nosep]
-    \item Systematically assess \textbf{data quality and completeness};
-    \item Uncover \textbf{temporal patterns and seasonality} in the target variable;
-    \item Identify the most \textbf{informative predictive features} for sub-seasonal temperature forecasting;
-    \item Provide evidence-based guidance on the \textbf{optimal number of features} and feature selection strategies for modeling.
-\end{enumerate}
 
 \newpage
 
@@ -113,7 +54,7 @@ The main objectives of this EDA are to:
 \begin{figure}[H]
     \centering
     \includegraphics[width=\textwidth]{figures/fig1_data_quality.png}
-    \caption{\textbf{Figure 1 --- Data Quality Overview.} Left: Distribution of the target variable \texttt{contest-tmp2m-14d} with mean and median markers. Right: Top 20 columns ranked by missing value percentage.}
+    \caption{Data Quality Overview. Left: Distribution of the target variable \texttt{contest-tmp2m-14d} with mean and median markers. Right: Top 20 columns ranked by missing value percentage.}
     \label{fig:data_quality}
 \end{figure}
 
@@ -123,12 +64,7 @@ The target variable exhibits an approximately symmetric and near-normal distribu
 
 The right panel lists the top columns ranked by missing value percentage. Only 8 columns exhibit missingness, with the highest rates around 4--5\%. These columns belong predominantly to the \textbf{CCSM30} and \textbf{CCSM3} model families (e.g., \texttt{nmme0-tmp2m-34w\_\_ccsm30}, \texttt{nmme-tmp2m-56w\_\_ccsm3}), indicating a systematic issue with those particular NMME model outputs. The overall data quality is high, with the vast majority of features being fully complete.
 
-\textbf{Key Findings:}
-\begin{itemize}[nosep]
-    \item The target variable is near-normally distributed (mean $\approx 11.9\,^\circ$C, median $\approx 12.3\,^\circ$C) with a slight negative skew.
-    \item Only 8 columns exhibit missing values, concentrated in the CCSM30 and CCSM3 model families, with maximum missingness around 4--5\%.
-    \item These columns should be carefully handled via imputation or removal; their missingness likely stems from model-specific data generation failures.
-\end{itemize}
+
 
 \newpage
 
@@ -154,12 +90,6 @@ The right panel reveals a distinct seasonal cycle corroborating the monthly data
 
 \subsection{Key Temporal Findings}
 
-\begin{itemize}[nosep]
-    \item Temperature shows a clear seasonal pattern, with weekly average temperature peaking at approximately $22\,^\circ\text{C}$ in July--August.
-    \item Temperature patterns across the two years are largely analogous.
-    \item Although some outliers exist, the box plot clearly shows the seasonal cycle; anomalies may indicate extreme weather events.
-    \item January and February temperatures exhibit wider variance, suggesting greater prediction difficulty in winter months.
-\end{itemize}
 
 \newpage
 
@@ -183,14 +113,6 @@ The left panel displays the correlation coefficients between each NMME model's f
 
 The right panel shows the ensemble mean plotted against observed temperatures, with points colored by season. The scatter points cluster tightly around the $y = x$ line, demonstrating excellent agreement with no systematic bias. The overall Pearson correlation is $r = 0.950$, confirming an extremely strong linear relationship. The four seasons are well mixed along the diagonal, indicating consistent performance across all seasons.
 
-\subsection{Key NMME Findings}
-
-\begin{itemize}[nosep]
-    \item The NMME ensemble mean achieves $r = 0.95$ with observed temperatures, closely following the $y = x$ line with no seasonal bias.
-    \item Most individual NMME models exhibit correlations around 0.90, with over 20 models surpassing $r = 0.9$.
-    \item CCSM3 models consistently underperform relative to the ensemble, with correlations slightly below 0.9; they could be downweighted or excluded in future ensemble constructions.
-\end{itemize}
-
 \newpage
 
 % ══════════════════════════════════════════════════════════════
@@ -212,27 +134,3 @@ The left panel reports the top 30 features based on the ensemble importance scor
 \subsection{Optimal Feature Count --- Learning Curve}
 
 The right panel shows the learning curve of CV RMSE as features are added in order of importance. A clear elbow appears at around \textbf{242 features}, after which the RMSE shows minimal improvement. This indicates that the model has captured most useful information by this point, and additional low-importance features mainly introduce noise rather than improving predictive skill.
-
-\subsection{Key Feature Selection Findings}
-
-\begin{itemize}[nosep]
-    \item Contest and NMME features provide the primary useful signals for sub-seasonal temperature prediction.
-    \item SST and sea-ice PCA features contribute meaningful oceanic boundary information.
-    \item The model reaches optimal performance at $\sim 242$ features; adding more low-importance features brings noise and weakens generalization.
-    \item Lasso, ElasticNet, and Random Forest show consistent agreement on the most important features, lending robustness to the ranking.
-\end{itemize}
-
-\newpage
-
-% ══════════════════════════════════════════════════════════════
-% Section 6: Summary and Implications for Modeling
-% ══════════════════════════════════════════════════════════════
-\section{Summary and Implications for Modeling}
-
-The target variable (mean = 11.86\,$^\circ$C, std = 9.87\,$^\circ$C) is near-normally distributed and spans September 2014 to August 2016, making it well-suited for regression modeling. The dataset is largely complete, with only a few CCSM30/CCSM3 columns exhibiting minor missingness ($\sim$4--5\%).
-
-A clear seasonal cycle is observed, peaking in summer and reaching lows in winter, where January--February show wider variance and greater prediction difficulty. The NMME ensemble mean achieves $r = 0.95$ with observed temperatures without seasonal bias, serving as a strong baseline predictor, while CCSM3 is the weakest member and could be downweighted.
-
-Feature importance analysis reveals that contest reanalysis variables and NMME forecasts dominate the top-ranked features, with an optimal elbow at approximately 242 features beyond which additional inputs mainly introduce noise.
-
-\end{document}

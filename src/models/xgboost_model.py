@@ -20,5 +20,5 @@ class XGBoostModel(BaseModel):
         return {
             'model__n_estimators': [300, 500, 800],
             'model__max_depth': [4, 6, 8],
-            'model__learning_rate': [0.03, 0.1, 0.2],
+            'model__learning_rate': [0.03, 0.05, 0.1, 0.2],
         }

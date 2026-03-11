@@ -11,14 +11,14 @@ class CatBoostModel(BaseModel):
         return Pipeline([
             ('scaler', self.default_scaler()),
             ('model', CatBoostRegressor(
-                iterations=500, depth=6, learning_rate=0.1,
+                iterations=2000, depth=6, learning_rate=0.1,
+                early_stopping_rounds=50,
                 verbose=0, random_seed=42,
             )),
         ])
 
     def param_grid(self):
         return {
-            'model__iterations': [300, 500, 800, 1000],
             'model__depth': [4, 6, 8],
-            'model__learning_rate': [0.025, 0.03, 0.1, 0.2],
+            'model__learning_rate': [0.03, 0.05, 0.1, 0.2],
         }
