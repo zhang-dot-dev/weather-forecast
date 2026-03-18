@@ -26,6 +26,9 @@ outputs/predictions/
 # Jupyter
 .ipynb_checkpoints/
 
+# CatBoost training logs
+catboost_info/
+
 # OS
 .DS_Store
 Thumbs.db
