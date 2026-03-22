@@ -26,14 +26,14 @@ weather-forecast/
 ├── src/                            # 共享函数库
 │   ├── preprocessing.py            #   数据加载、清洗、缺失值填充
 │   ├── feature_engineering.py      #   特征重要性计算、特征选择
-│   ├── models.py                   #   模型定义（Lasso / ElasticNet / RF）
+│   ├── models/                     #   模型注册中心与各模型定义
 │   └── evaluate.py                 #   交叉验证、评估指标、学习曲线
 │
-├── notebooks/                      # 分析 & 实验（每人负责一个）
+├── notebooks/                      # 分析 & 实验
 │   ├── 01_eda.ipynb                #   探索性数据分析
 │   ├── 02_preprocessing.ipynb      #   数据预处理 & 特征工程
-│   ├── 03_modeling.ipynb           #   模型训练 & 调参
-│   └── 04_evaluation.ipynb         #   模型评估 & 预测
+│   ├── 03_modeling.ipynb           #   单模型训练、调参与 run 记录
+│   └── 04_ensemble.ipynb           #   从历史 run 中挑最佳参数并做 ensemble
 │
 ├── data/
 │   ├── raw/                        # 原始数据（不修改）
@@ -41,8 +41,10 @@ weather-forecast/
 │
 └── outputs/
     ├── models/                     # 保存的模型文件 (.pkl)
-    ├── figures/                    # EDA & 评估可视化图片
-    └── predictions/                # 测试集预测结果
+    ├── figures/                    # EDA / ensemble 可视化图片
+    ├── predictions/                # 测试集预测结果
+    ├── run_history.csv             # 单模型历史运行记录
+    └── ensemble_history.csv        # ensemble 历史运行记录
 ```
 
 ## 环境配置
@@ -67,7 +69,7 @@ pip install -r requirements.txt
 python main.py
 
 # 方式二：按 notebook 逐步执行
-# 打开 notebooks/ 下的 01 → 02 → 03 → 04 依次运行
+# 打开 notebooks/ 下的 01 → 02 → 03 → 04_ensemble 依次运行
 ```
 
 ## 当前进度
@@ -76,4 +78,4 @@ python main.py
 - [x] EDA 探索性数据分析（`01_eda.ipynb`）
 - [ ] 数据预处理 & 特征工程（`02_preprocessing.ipynb`）
 - [ ] 模型训练 & 超参调优（`03_modeling.ipynb`）
-- [ ] 模型评估 & 测试集预测（`04_evaluation.ipynb`）
+- [ ] 历史最优参数集成（`04_ensemble.ipynb`）

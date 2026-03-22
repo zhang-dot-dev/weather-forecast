@@ -12,17 +12,22 @@ def load_and_clean(path):
 
 def add_time_features(df):
     """从 startdate 派生 year / month / day / week / season。"""
-    df['startdate'] = pd.to_datetime(df['startdate'])
-    df['year']   = df['startdate'].dt.year
-    df['month']  = df['startdate'].dt.month
-    df['day']    = df['startdate'].dt.day
-    df['week']   = df['startdate'].dt.isocalendar().week.astype(int)
-    df['season'] = df['month'].map({
-        12: 'Winter', 1: 'Winter', 2: 'Winter',
-        3:  'Spring', 4: 'Spring', 5: 'Spring',
-        6:  'Summer', 7: 'Summer', 8: 'Summer',
-        9:  'Fall',  10: 'Fall',  11: 'Fall',
-    })
+    dt = pd.to_datetime(df['startdate'], format='%m/%d/%y')
+    month = dt.dt.month
+    week = dt.dt.isocalendar().week.to_numpy(dtype='int32', na_value=0)
+    time_cols = pd.DataFrame({
+        'year':   dt.dt.year,
+        'month':  month,
+        'day':    dt.dt.day,
+        'week':   week,
+        'season': month.map({
+            12: 'Winter', 1: 'Winter', 2: 'Winter',
+            3:  'Spring', 4: 'Spring', 5: 'Spring',
+            6:  'Summer', 7: 'Summer', 8: 'Summer',
+            9:  'Fall',  10: 'Fall',  11: 'Fall',
+        }),
+    }, index=df.index)
+    df = pd.concat([df.assign(startdate=dt), time_cols], axis=1)
     return df
 
 
