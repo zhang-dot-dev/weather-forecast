@@ -11,16 +11,18 @@ class CatBoostModel(BaseModel):
         return Pipeline([
             ('scaler', self.default_scaler()),
             ('model', CatBoostRegressor(
-                iterations=800, depth=6, learning_rate=0.1,
-                early_stopping_rounds=50,
+                iterations=8000,
+                learning_rate=0.02,
+                depth=8,
+                min_data_in_leaf=20,
+                l2_leaf_reg=5.0,
+                random_strength=1.0,
+                bagging_temperature=0.5,
+                rsm=0.8,
+                early_stopping_rounds=300,
                 verbose=0, random_seed=42,
             )),
         ])
 
     def param_grid(self):
-        return {
-            'model__depth': [4, 6, 8],
-            'model__learning_rate': [0.01, 0.03, 0.05, 0.1],
-            'model__l2_leaf_reg': [1, 3, 5, 7, 9],
-            'model__bagging_temperature': [0, 1],
-        }
+        return {}  # 暂时跳过网格搜索，直接用 build_pipeline 的默认参数

@@ -10,11 +10,8 @@ class ElasticNetModel(BaseModel):
     def build_pipeline(self):
         return Pipeline([
             ('scaler', self.default_scaler()),
-            ('model', ElasticNet(alpha=0.1, l1_ratio=0.5, max_iter=10000)),
+            ('model', ElasticNet(alpha=0.01, l1_ratio=0.2, max_iter=10000)),
         ])
 
     def param_grid(self):
-        return {
-            'model__alpha': [0.01, 0.05, 0.2, 0.1, 0.5],
-            'model__l1_ratio': [0.1,0.2, 0.5, 0.8],
-        }
+        return {}  # 已用历史最优参数，跳过网格搜索

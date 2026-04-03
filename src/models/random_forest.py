@@ -11,14 +11,11 @@ class RandomForestModel(BaseModel):
         return Pipeline([
             ('scaler', self.default_scaler()),
             ('model', RandomForestRegressor(
-                n_estimators=200, max_depth=10,
+                n_estimators=2000, max_depth=14,
+                min_samples_leaf=5,
                 n_jobs=-1, random_state=42,
             )),
         ])
 
     def param_grid(self):
-        return {
-            'model__n_estimators': [100, 200, 300, 400, 500],
-            'model__max_depth': [6, 8, 10, 12, 15, 20],
-            'model__min_samples_leaf': [5, 10],
-        }
+        return {}  # 已用历史最优参数，跳过网格搜索

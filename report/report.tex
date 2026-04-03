@@ -1,0 +1,338 @@
+%==========================================================
+%  Section 3: Implementation
+%==========================================================
+\section{Implementation}
+
+%----------------------------------------------------------
+\subsection{Feature Engineering via Grouped PCA}
+%----------------------------------------------------------
+
+\subsubsection{Motivation}
+
+The raw training dataset contains several hundred meteorological predictors,
+many of which share strong inter-group collinearity.
+For instance, the NMME ensemble model outputs for temperature forecasts
+(\texttt{nmme-tmp2m-34w}, \texttt{nmme0-tmp2m-34w}) and geopotential height fields
+at multiple pressure levels (\texttt{hgt10}, \texttt{hgt100}, \texttt{hgt500},
+\texttt{hgt850}) each form a block of near-redundant variables.
+Feeding all raw features directly into a regression model risks overfitting,
+inflates training cost, and may obscure the dominant climate signal
+within each physical group.
+We therefore apply \textbf{Grouped PCA} to compress each meteorological block
+independently while preserving its principal modes of variability.
+
+\subsubsection{Principal Component Analysis}
+
+Let $\mathbf{X} \in \mathbb{R}^{n \times p}$ denote a mean-centred, unit-variance
+scaled feature matrix with $n$ samples and $p$ variables.
+PCA seeks an orthogonal transformation
+$\mathbf{W} = [\mathbf{w}_1, \ldots, \mathbf{w}_k] \in \mathbb{R}^{p \times k}$
+that maximises the variance of the projected data:
+
+\begin{equation}
+  \mathbf{w}_j = \underset{\|\mathbf{w}\|=1}{\arg\max}\;
+  \mathrm{Var}(\mathbf{X}\mathbf{w})
+  \quad \text{s.t.}\quad \mathbf{w}_j \perp \mathbf{w}_i,\; \forall\, i < j.
+  \label{eq:pca}
+\end{equation}
+
+The solution is given by the $k$ leading eigenvectors of the sample covariance
+matrix $\mathbf{\Sigma} = \frac{1}{n-1}\mathbf{X}^\top\mathbf{X}$,
+equivalently the top-$k$ right singular vectors from the SVD decomposition
+$\mathbf{X} = \mathbf{U}\mathbf{\Sigma}\mathbf{V}^\top$.
+The resulting score matrix
+$\mathbf{Z} = \mathbf{X}\mathbf{W} \in \mathbb{R}^{n \times k}$
+contains $k$ uncorrelated principal components (PCs) that capture the maximum
+variance in the original data.
+
+\subsubsection{Grouped PCA Design}
+
+Rather than applying a single global PCA, we partition the feature space into
+11 meteorologically meaningful groups and fit an independent
+PCA within each group on the \emph{raw} (unscaled) features
+(Table~\ref{tab:pca_groups}).
+For each group, the number of principal components is chosen dynamically
+as the smallest $k$ such that the cumulative explained variance ratio
+$\sum_{j=1}^{k}\lambda_j / \sum_{j=1}^{p}\lambda_j \geq 0.95$,
+ensuring that at least 95\% of the within-group variance is preserved.
+This design (i) respects the physical boundaries between variable types,
+(ii) prevents dominant groups from absorbing the variance budget of smaller groups,
+and (iii) adaptively reduces the total feature dimension from $\sim$500+ to 92
+(61 PCA components $+$ 31 pass-through features)
+whilst retaining interpretable PC names.
+Features not belonging to any PCA group (e.g.\ latitude, longitude,
+temporal encodings, \texttt{contest-*} benchmark predictors) are passed
+through unchanged.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Grouped PCA configuration (95\% variance threshold).}
+  \label{tab:pca_groups}
+  \begin{tabular}{llcc}
+    \toprule
+    Group name & Source variables & \#\ Input cols & \#\ PCs \\
+    \midrule
+    \texttt{nmme\_tmp34w} & NMME 3--4 week temperature ensemble & varies & 2 \\
+    \texttt{nmme\_tmp56w} & NMME 5--6 week temperature ensemble & varies & 1 \\
+    \texttt{nmme\_prate}  & NMME precipitation ensemble (3--6 wk) & varies & 12 \\
+    \texttt{hgt10}        & Geopotential height at 10 hPa  & varies & 2 \\
+    \texttt{hgt100}       & Geopotential height at 100 hPa & varies & 2 \\
+    \texttt{hgt500}       & Geopotential height at 500 hPa & varies & 6 \\
+    \texttt{hgt850}       & Geopotential height at 850 hPa & varies & 8 \\
+    \texttt{sst}          & Sea surface temperature (2010--) & varies & 2 \\
+    \texttt{icec}         & Sea ice concentration (2010--)   & varies & 3 \\
+    \texttt{wind\_uv}     & U/V wind at 250/925 hPa          & varies & 21 \\
+    \texttt{tele}         & Teleconnection indices (MEI, MJO) & varies & 2 \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{Total PCA components}} & \textbf{61} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The PCA is fitted \emph{exclusively on the training split} and
+applied without re-fitting to the validation and test sets, ensuring no
+look-ahead leakage.
+No feature-wise standardisation is applied prior to PCA;
+because features within each meteorological group share similar physical
+scales, raw-scale PCA naturally preserves the dominant variance directions
+without artificially equalising low-variance noise channels.
+
+%----------------------------------------------------------
+\subsection{Predictive Models}
+%----------------------------------------------------------
+
+All models share the same input feature set produced by Grouped PCA
+(92-dimensional output) and are wrapped in a
+\texttt{sklearn.pipeline.Pipeline} that prepends a \texttt{StandardScaler}
+to normalise inputs before tree-based methods (for numerical stability)
+and to satisfy the assumptions of linear methods.
+Hyperparameters are selected via \textbf{GridSearchCV} with
+\textbf{TimeSeriesSplit} ($n\_splits=5$) to respect temporal ordering.
+
+\subsubsection{Lasso Regression}
+
+Lasso augments the ordinary least-squares objective with an $\ell_1$ penalty:
+
+\begin{equation}
+  \hat{\boldsymbol{\beta}}_{\text{Lasso}} =
+  \underset{\boldsymbol{\beta}}{\arg\min}\;
+  \frac{1}{n}\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|_2^2
+  + \alpha \|\boldsymbol{\beta}\|_1.
+  \label{eq:lasso}
+\end{equation}
+
+The $\ell_1$ norm induces sparsity by driving irrelevant coefficients exactly
+to zero, effectively performing automatic feature selection.
+We set the regularisation strength to $\alpha = \text{\texttt{LASSO\_ALPHA}}$
+and allow up to 5000 coordinate-descent iterations.
+
+\subsubsection{Elastic Net}
+
+Elastic Net combines the $\ell_1$ and $\ell_2$ penalties,
+balancing sparsity and grouping effects:
+
+\begin{equation}
+  \hat{\boldsymbol{\beta}}_{\text{EN}} =
+  \underset{\boldsymbol{\beta}}{\arg\min}\;
+  \frac{1}{n}\|\mathbf{y} - \mathbf{X}\boldsymbol{\beta}\|_2^2
+  + \alpha\!\left[\rho\|\boldsymbol{\beta}\|_1
+    + \frac{1-\rho}{2}\|\boldsymbol{\beta}\|_2^2\right],
+  \label{eq:elasticnet}
+\end{equation}
+
+where $\rho \in [0,1]$ is the $\ell_1$ mixing ratio (\texttt{l1\_ratio}).
+We use $\alpha = \text{\texttt{ENET\_ALPHA}}$ and $\rho = \text{\texttt{ENET\_L1\_RATIO}}$.
+
+\subsubsection{Random Forest}
+
+Random Forest constructs an ensemble of $B$ decision trees
+$\{T_b\}_{b=1}^B$, each grown on a bootstrap replicate of the training data
+and using a random subset of $\lfloor\sqrt{p}\rfloor$ features at every split
+(CART criterion for regression):
+
+\begin{equation}
+  \hat{y} = \frac{1}{B}\sum_{b=1}^{B} T_b(\mathbf{x}).
+  \label{eq:rf}
+\end{equation}
+
+The randomisation over both samples and features decorrelates the trees,
+reducing variance without substantially increasing bias.
+We use $B=50$ trees with \texttt{max\_depth}$=10$;
+\texttt{max\_depth} is further tuned over $\{6,8,10,12,14\}$ and
+\texttt{min\_samples\_leaf} over $\{5,10\}$ via grid search.
+
+\subsubsection{XGBoost}
+
+XGBoost (eXtreme Gradient Boosting) builds an additive ensemble
+of regression trees in a stage-wise fashion by minimising a regularised
+second-order Taylor expansion of the loss:
+
+\begin{equation}
+  \mathcal{L}^{(t)} = \sum_{i=1}^{n}
+  \left[g_i f_t(\mathbf{x}_i) + \tfrac{1}{2}h_i f_t^2(\mathbf{x}_i)\right]
+  + \Omega(f_t),
+  \label{eq:xgboost}
+\end{equation}
+
+where $g_i = \partial_{\hat{y}^{(t-1)}}\ell(y_i, \hat{y}^{(t-1)})$ and
+$h_i = \partial^2_{\hat{y}^{(t-1)}}\ell(y_i, \hat{y}^{(t-1)})$ are the first
+and second gradients of the MSE loss, and
+$\Omega(f_t) = \gamma T + \tfrac{1}{2}\lambda\|\mathbf{w}\|^2$ penalises tree
+complexity ($T$: leaf count, $\mathbf{w}$: leaf weights) \cite{Chen2016}.
+Configuration: \texttt{n\_estimators}$=1000$, \texttt{max\_depth}$=6$,
+\texttt{learning\_rate}$=0.1$; grid search tunes
+\texttt{max\_depth} $\in\{4,6,8\}$ and \texttt{learning\_rate} $\in\{0.03,0.05,0.1,0.2\}$.
+
+\subsubsection{LightGBM}
+
+LightGBM shares the GBDT objective of XGBoost but uses two key
+algorithmic innovations for scalability:
+\textit{Gradient-based One-Side Sampling} (GOSS), which retains all instances
+with large gradients while randomly sub-sampling those with small gradients,
+and \textit{Exclusive Feature Bundling} (EFB), which merges mutually exclusive
+sparse features to reduce the effective feature dimension.
+Furthermore, LightGBM grows trees \emph{leaf-wise} rather than level-wise,
+enabling deeper effective trees with fewer splits.
+The leaf count \texttt{num\_leaves}$=31$ (tuned over $\{15,23,31\}$) controls
+model complexity more directly than depth alone;
+\texttt{learning\_rate} is tuned over $\{0.03,0.05,0.1,0.2\}$.
+
+\subsubsection{CatBoost}
+
+CatBoost introduces \textit{Ordered Boosting} to
+eliminate the target leakage inherent in standard GBDT: for each training
+example, the model that generated its gradient is trained on a permutation
+of the dataset that does not include that example.
+It also implements an efficient ordered target statistics encoding for
+categorical variables.
+Configuration: \texttt{iterations}$=1000$, \texttt{depth}$=6$,
+\texttt{learning\_rate}$=0.1$, \texttt{early\_stopping\_rounds}$=50$.
+Grid search tunes \texttt{depth} $\in\{4,6,8\}$,
+\texttt{learning\_rate} $\in\{0.01,0.03,0.05,0.1\}$,
+\texttt{l2\_leaf\_reg} $\in\{1,3,5,7,9\}$, and
+\texttt{bagging\_temperature} $\in\{0,1\}$.
+
+%----------------------------------------------------------
+\subsection{Stacking Ensemble}
+%----------------------------------------------------------
+
+To combine the strengths of all base learners we employ
+\textbf{Stacked Generalisation} (Stacking).
+The procedure is:
+
+\begin{enumerate}
+  \item Select the top-$K=3$ base models ranked by their reconstructed test RMSE.
+  \item Generate \emph{out-of-fold} (OOF) predictions for each base model using
+        \textbf{TimeSeriesSplit} ($n\_splits=5$) on the training set,
+        producing a meta-feature matrix
+        $\tilde{\mathbf{X}} \in \mathbb{R}^{n_\text{train} \times K}$.
+  \item Fit five candidate meta-fusion strategies on the OOF matrix:
+        (a) non-negative convex combination via SLSQP ($\sum w_i=1$),
+        (b) inverse-OOF-RMSE$^2$ weighting,
+        (c) RidgeCV with inner time-series CV,
+        (d) non-negative Lasso, and
+        (e) OLS baseline.
+        The strategy with the lowest OOF RMSE is selected automatically.
+  \item At inference, obtain base-model predictions on the test set and
+        feed them to the chosen meta-learner to produce the final forecast.
+\end{enumerate}
+
+Using OOF predictions prevents the meta-learner from seeing test information
+during training, and respecting temporal ordering in the CV splits avoids
+look-ahead bias.
+
+%==========================================================
+%  Section 4: Evaluation
+%==========================================================
+\section{Evaluation}
+
+%----------------------------------------------------------
+\subsection{Evaluation Metrics}
+%----------------------------------------------------------
+
+Model performance is quantified with two complementary metrics.
+
+\paragraph{Root Mean Squared Error (RMSE).}
+\begin{equation}
+  \text{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n}(y_i - \hat{y}_i)^2}.
+  \label{eq:rmse}
+\end{equation}
+RMSE is expressed in the same unit as the target variable (°F for temperature)
+and penalises large errors more heavily than small ones.
+
+\paragraph{Coefficient of Determination ($R^2$).}
+\begin{equation}
+  R^2 = 1 - \frac{\sum_{i=1}^{n}(y_i - \hat{y}_i)^2}
+                  {\sum_{i=1}^{n}(y_i - \bar{y})^2},
+  \label{eq:r2}
+\end{equation}
+where $\bar{y}$ is the mean of the observed values.
+$R^2 = 1$ indicates a perfect fit; $R^2 = 0$ means the model performs
+no better than predicting the mean.
+
+%----------------------------------------------------------
+\subsection{Experimental Results}
+%----------------------------------------------------------
+
+\subsubsection{Individual Model Performance}
+
+Table~\ref{tab:model_results} reports the held-out test RMSE and $R^2$
+for all six models under the best-per-model historical run.
+Three models achieved their best result under the 50-feature fixed-component
+PCA (run \texttt{20260325}), while the remaining three improved after
+switching to the 92-feature dynamic-threshold PCA (run \texttt{20260403}).
+
+\begin{table}[htbp]
+  \centering
+  \caption{Individual model performance (80/20 temporal split, best historical run per model).}
+  \label{tab:model_results}
+  \begin{tabular}{lccc}
+    \toprule
+    Model         & Test RMSE & Test $R^2$ & \#\ Features \\
+    \midrule
+    LightGBM      & 1.2094  & 0.9638 & 50 \\
+    XGBoost       & 1.3058  & 0.9578 & 92 \\
+    CatBoost      & 1.3111  & 0.9575 & 50 \\
+    Elastic Net   & 1.5153  & 0.9432 & 92 \\
+    Lasso         & 1.6224  & 0.9348 & 92 \\
+    Random Forest & 1.7702  & 0.9224 & 50 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The three gradient boosting methods (LightGBM, CatBoost, XGBoost) consistently
+outperform the linear and Random Forest baselines on the test set.
+LightGBM achieves the lowest test RMSE of \textbf{1.2094} ($R^2=0.9638$).
+The dynamic-threshold PCA brought notable improvements to the linear models:
+Elastic Net dropped from 1.7230 to \textbf{1.5153} and Lasso from 1.7284
+to \textbf{1.6224}, as the richer 92-feature representation captures
+more variance that linear methods can exploit directly.
+XGBoost also improved from 1.3767 to \textbf{1.3058}.
+
+\subsubsection{Stacking Ensemble Performance}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Stacking ensemble results (Top-3 base models: LightGBM, CatBoost, XGBoost).}
+  \label{tab:ensemble_results}
+  \begin{tabular}{lccc}
+    \toprule
+    Method              & Test RMSE & Test $R^2$ & Weights \\
+    \midrule
+    LightGBM (best single)        & 1.2094 & 0.9638 & -- \\
+    CatBoost                      & 1.3111 & 0.9575 & -- \\
+    XGBoost                       & 1.3767 & 0.9531 & -- \\
+    \midrule
+    Stacking (Convex SLSQP)       & \textbf{1.1993} & \textbf{0.9644} & 0.51 / 0.49 / 0.01 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The stacking ensemble uses five candidate meta-fusion strategies---constrained
+convex combination (SLSQP), inverse-OOF-RMSE$^2$ weighting, RidgeCV,
+non-negative Lasso, and OLS---and automatically selects the one with the
+lowest out-of-fold RMSE.
+The convex combination was chosen, assigning nearly all weight to
+LightGBM (0.51) and CatBoost (0.49) while effectively discarding XGBoost.
+The resulting test RMSE of \textbf{1.1993} ($R^2=0.9644$) improves upon the
+best single model by 0.8\%.

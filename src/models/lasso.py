@@ -10,10 +10,8 @@ class LassoModel(BaseModel):
     def build_pipeline(self):
         return Pipeline([
             ('scaler', self.default_scaler()),
-            ('model', Lasso(alpha=0.1, max_iter=10000)),
+            ('model', Lasso(alpha=0.01, max_iter=10000)),
         ])
 
     def param_grid(self):
-        return {
-            'model__alpha': [0.01, 0.05, 0.1, 0.5, 1.0],
-        }
+        return {}  # 已用历史最优参数，跳过网格搜索
