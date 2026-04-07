@@ -23,6 +23,9 @@ data/processed/*
 outputs/models/
 outputs/predictions/
 
+# Large model files in final
+data/final/*.pkl
+
 # Jupyter
 .ipynb_checkpoints/
 
